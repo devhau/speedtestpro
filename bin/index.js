@@ -1,4 +1,8 @@
 #! /usr/bin/env node
 const { SpeedTest } = require("./../");
 const stp = new SpeedTest();
-stp.start();
+setTimeout(async () => {
+  await stp.start();
+  await stp.loadServer();
+  console.log(stp.servers);
+});
