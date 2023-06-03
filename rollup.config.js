@@ -3,13 +3,13 @@ import resolve from "@rollup/plugin-node-resolve";
 import babel from "@rollup/plugin-babel";
 import scss from "rollup-plugin-scss";
 import pkg from "./package.json";
-
+import json from "@rollup/plugin-json";
 const extensions = [".js", ".jsx", ".ts", ".tsx"];
 
-const name = "rollup-typescript-sass-package-template";
+const name = "speedtest";
 
 export default {
-  input: "./src/rollup-typescript-sass-package-template.ts",
+  input: "./src/speedtest.ts",
 
   // Specify here external modules which you don't want to include in your bundle (for instance: 'lodash', 'moment' etc.)
   // https://rollupjs.org/guide/en/#external
@@ -17,11 +17,12 @@ export default {
 
   plugins: [
     // Allows node_modules resolution
-    resolve({ extensions }),
+    resolve({
+      extensions,
+    }),
 
     // Allow bundling cjs modules. Rollup doesn't understand cjs
     commonjs(),
-
     // Compile TypeScript/JavaScript files
     babel({
       extensions,
@@ -29,6 +30,7 @@ export default {
       include: ["src/**/*"],
     }),
     scss(),
+    json(),
   ],
 
   output: [
@@ -38,15 +40,14 @@ export default {
     },
     {
       file: pkg.module,
-      format: 'esm',
+      format: "esm",
       // Removes the hash from the asset filename
-      assetFileNames: '[name][extname]'
+      assetFileNames: "[name][extname]",
     },
     {
       file: pkg.browser,
       format: "iife",
       name,
-
       // https://rollupjs.org/guide/en/#outputglobals
       globals: {},
     },
