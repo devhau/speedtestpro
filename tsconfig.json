@@ -12,7 +12,8 @@
     "declaration": true,
     "target": "esnext",
     "module": "esnext",
-    "strict": true
+    "strict": true,
+    "importHelpers":false
   },
   "ts-node": { "experimentalSpecifierResolution": "node", "esm": true },
   "include": ["src/**/*"],

@@ -1,8 +1,8 @@
 import "./speedtest.scss";
-import { Worker } from "./worker";
+import { ManagerSpeed } from "./speed/manager";
 export declare class SpeedTest {
-    inst: Worker;
+    inst: ManagerSpeed;
     servers: never[];
     loadServer(): Promise<void>;
-    start(): Promise<void>;
+    start(): void;
 }

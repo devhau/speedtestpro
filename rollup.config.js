@@ -1,11 +1,11 @@
 import commonjs from "@rollup/plugin-commonjs";
 import resolve from "@rollup/plugin-node-resolve";
 import babel from "@rollup/plugin-babel";
+import typescript from "@rollup/plugin-typescript";
 import scss from "rollup-plugin-scss";
 import pkg from "./package.json";
 import json from "@rollup/plugin-json";
 const extensions = [".js", ".jsx", ".ts", ".tsx"];
-
 const name = "speedtest";
 
 export default {
@@ -16,9 +16,12 @@ export default {
   external: [],
 
   plugins: [
+    typescript(),
     // Allows node_modules resolution
     resolve({
       extensions,
+      jsnext: true,
+      browser: false,
     }),
 
     // Allow bundling cjs modules. Rollup doesn't understand cjs
@@ -27,6 +30,7 @@ export default {
     babel({
       extensions,
       babelHelpers: "bundled",
+      // presets: [["solid", { generate: "ssr", hydratable: true }]],
       include: ["src/**/*"],
     }),
     scss(),
@@ -47,9 +51,13 @@ export default {
     {
       file: pkg.browser,
       format: "iife",
+      sourcemap: "inline",
       name,
       // https://rollupjs.org/guide/en/#outputglobals
-      globals: {},
+      globals: {
+        "node:buffer": "window",
+        axios: "node_modules/axios/dist/browser/axios.cjs.js",
+      },
     },
   ],
 };

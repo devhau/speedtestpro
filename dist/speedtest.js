@@ -10,11 +10,10 @@ var require$$4 = require('https');
 var require$$0$1 = require('url');
 var require$$6 = require('fs');
 var require$$4$1 = require('assert');
-var require$$0$3 = require('tty');
+var require$$1$2 = require('tty');
 var require$$0$2 = require('os');
 var zlib = require('zlib');
 var EventEmitter = require('events');
-var node_buffer = require('node:buffer');
 
 function _interopDefaultLegacy (e) { return e && typeof e === 'object' && 'default' in e ? e : { 'default': e }; }
 
@@ -26,7 +25,7 @@ var require$$4__default = /*#__PURE__*/_interopDefaultLegacy(require$$4);
 var require$$0__default = /*#__PURE__*/_interopDefaultLegacy(require$$0$1);
 var require$$6__default = /*#__PURE__*/_interopDefaultLegacy(require$$6);
 var require$$4__default$1 = /*#__PURE__*/_interopDefaultLegacy(require$$4$1);
-var require$$0__default$2 = /*#__PURE__*/_interopDefaultLegacy(require$$0$3);
+var require$$1__default$2 = /*#__PURE__*/_interopDefaultLegacy(require$$1$2);
 var require$$0__default$1 = /*#__PURE__*/_interopDefaultLegacy(require$$0$2);
 var zlib__default = /*#__PURE__*/_interopDefaultLegacy(zlib);
 var EventEmitter__default = /*#__PURE__*/_interopDefaultLegacy(EventEmitter);
@@ -14964,12 +14963,12 @@ var hasRequiredHasFlag;
 function requireHasFlag () {
 	if (hasRequiredHasFlag) return hasFlag;
 	hasRequiredHasFlag = 1;
-	hasFlag = (flag, argv) => {
-		argv = argv || process.argv;
+
+	hasFlag = (flag, argv = process.argv) => {
 		const prefix = flag.startsWith('-') ? '' : (flag.length === 1 ? '-' : '--');
-		const pos = argv.indexOf(prefix + flag);
-		const terminatorPos = argv.indexOf('--');
-		return pos !== -1 && (terminatorPos === -1 ? true : pos < terminatorPos);
+		const position = argv.indexOf(prefix + flag);
+		const terminatorPosition = argv.indexOf('--');
+		return position !== -1 && (terminatorPosition === -1 || position < terminatorPosition);
 	};
 	return hasFlag;
 }
@@ -14981,23 +14980,32 @@ function requireSupportsColor () {
 	if (hasRequiredSupportsColor) return supportsColor_1;
 	hasRequiredSupportsColor = 1;
 	const os = require$$0__default$1["default"];
+	const tty = require$$1__default$2["default"];
 	const hasFlag = requireHasFlag();
 
-	const env = process.env;
+	const {env} = process;
 
 	let forceColor;
 	if (hasFlag('no-color') ||
 		hasFlag('no-colors') ||
-		hasFlag('color=false')) {
-		forceColor = false;
+		hasFlag('color=false') ||
+		hasFlag('color=never')) {
+		forceColor = 0;
 	} else if (hasFlag('color') ||
 		hasFlag('colors') ||
 		hasFlag('color=true') ||
 		hasFlag('color=always')) {
-		forceColor = true;
+		forceColor = 1;
 	}
+
 	if ('FORCE_COLOR' in env) {
-		forceColor = env.FORCE_COLOR.length === 0 || parseInt(env.FORCE_COLOR, 10) !== 0;
+		if (env.FORCE_COLOR === 'true') {
+			forceColor = 1;
+		} else if (env.FORCE_COLOR === 'false') {
+			forceColor = 0;
+		} else {
+			forceColor = env.FORCE_COLOR.length === 0 ? 1 : Math.min(parseInt(env.FORCE_COLOR, 10), 3);
+		}
 	}
 
 	function translateLevel(level) {
@@ -15013,8 +15021,8 @@ function requireSupportsColor () {
 		};
 	}
 
-	function supportsColor(stream) {
-		if (forceColor === false) {
+	function supportsColor(haveStream, streamIsTTY) {
+		if (forceColor === 0) {
 			return 0;
 		}
 
@@ -15028,22 +15036,21 @@ function requireSupportsColor () {
 			return 2;
 		}
 
-		if (stream && !stream.isTTY && forceColor !== true) {
+		if (haveStream && !streamIsTTY && forceColor === undefined) {
 			return 0;
 		}
 
-		const min = forceColor ? 1 : 0;
+		const min = forceColor || 0;
+
+		if (env.TERM === 'dumb') {
+			return min;
+		}
 
 		if (process.platform === 'win32') {
-			// Node.js 7.5.0 is the first version of Node.js to include a patch to
-			// libuv that enables 256 color output on Windows. Anything earlier and it
-			// won't work. However, here we target Node.js 8 at minimum as it is an LTS
-			// release, and Node.js 7 is not. Windows 10 build 10586 is the first Windows
-			// release that supports 256 colors. Windows 10 build 14931 is the first release
-			// that supports 16m/TrueColor.
+			// Windows 10 build 10586 is the first Windows release that supports 256 colors.
+			// Windows 10 build 14931 is the first release that supports 16m/TrueColor.
 			const osRelease = os.release().split('.');
 			if (
-				Number(process.versions.node.split('.')[0]) >= 8 &&
 				Number(osRelease[0]) >= 10 &&
 				Number(osRelease[2]) >= 10586
 			) {
@@ -15054,7 +15061,7 @@ function requireSupportsColor () {
 		}
 
 		if ('CI' in env) {
-			if (['TRAVIS', 'CIRCLECI', 'APPVEYOR', 'GITLAB_CI'].some(sign => sign in env) || env.CI_NAME === 'codeship') {
+			if (['TRAVIS', 'CIRCLECI', 'APPVEYOR', 'GITLAB_CI', 'GITHUB_ACTIONS', 'BUILDKITE'].some(sign => sign in env) || env.CI_NAME === 'codeship') {
 				return 1;
 			}
 
@@ -15093,22 +15100,18 @@ function requireSupportsColor () {
 			return 1;
 		}
 
-		if (env.TERM === 'dumb') {
-			return min;
-		}
-
 		return min;
 	}
 
 	function getSupportLevel(stream) {
-		const level = supportsColor(stream);
+		const level = supportsColor(stream, stream && stream.isTTY);
 		return translateLevel(level);
 	}
 
 	supportsColor_1 = {
 		supportsColor: getSupportLevel,
-		stdout: getSupportLevel(process.stdout),
-		stderr: getSupportLevel(process.stderr)
+		stdout: translateLevel(supportsColor(true, tty.isatty(1))),
+		stderr: translateLevel(supportsColor(true, tty.isatty(2)))
 	};
 	return supportsColor_1;
 }
@@ -15123,7 +15126,7 @@ function requireNode () {
 	if (hasRequiredNode) return nodeExports;
 	hasRequiredNode = 1;
 	(function (module, exports) {
-		const tty = require$$0__default$2["default"];
+		const tty = require$$1__default$2["default"];
 		const util = require$$1__default["default"];
 
 		/**
@@ -18300,70 +18303,109 @@ axios.HttpStatusCode = HttpStatusCode;
 
 axios.default = axios;
 
-class Worker {
-  settings = {
-    mpot: false,
-    //set to true when in MPOT mode
-    test_order: "IP_D_U",
-    //order in which tests will be performed as a string. D=Download, U=Upload, P=Ping+Jitter, I=IP, _=1 second delay
-    time_ul_max: 15,
-    // max duration of upload test in seconds
-    time_dl_max: 15,
-    // max duration of download test in seconds
-    time_auto: true,
-    // if set to true, tests will take less time on faster connections
-    time_ulGraceTime: 3,
-    //time to wait in seconds before actually measuring ul speed (wait for buffers to fill)
-    time_dlGraceTime: 1.5,
-    //time to wait in seconds before actually measuring dl speed (wait for TCP window to increase)
-    count_ping: 10,
-    // number of pings to perform in ping test
-    url_dl: "garbage.php",
-    // path to a large file or garbage.php, used for download test. must be relative to this js file
-    url_ul: "empty.php",
-    // path to an empty file, used for upload test. must be relative to this js file
-    url_ping: "empty.php",
-    // path to an empty file, used for ping test. must be relative to this js file
-    url_getIp: "getIP.php",
-    // path to getIP.php relative to this js file, or a similar thing that outputs the client's ip
-    getIp_ispInfo: true,
-    //if set to true, the server will include ISP info with the IP address
-    getIp_ispInfo_distance: "km",
-    //km or mi=estimate distance from server in km/mi; set to false to disable distance estimation. getIp_ispInfo must be enabled in order for this to work
-    xhr_dlMultistream: 6,
-    // number of download streams to use (can be different if enable_quirks is active)
-    xhr_ulMultistream: 3,
-    // number of upload streams to use (can be different if enable_quirks is active)
-    xhr_multistreamDelay: 300,
-    //how much concurrent requests should be delayed
-    xhr_ignoreErrors: 1,
-    // 0=fail on errors, 1=attempt to restart a stream if it fails, 2=ignore all errors
-    xhr_dlUseBlob: false,
-    // if set to true, it reduces ram usage but uses the hard drive (useful with large garbagePhp_chunkSize and/or high xhr_dlMultistream)
-    xhr_ul_blob_megabytes: 20,
-    //size in megabytes of the upload blobs sent in the upload test (forced to 4 on chrome mobile)
-    garbagePhp_chunkSize: 100,
-    // size of chunks sent by garbage.php (can be different if enable_quirks is active)
-    enable_quirks: true,
-    // enable quirks for specific browsers. currently it overrides settings to optimize for specific browsers, unless they are already being overridden with the start command
-    ping_allowPerformanceApi: true,
-    // if enabled, the ping test will attempt to calculate the ping more precisely using the Performance API. Currently works perfectly in Chrome, badly in Edge, and not at all in Firefox. If Performance API is not supported or the result is obviously wrong, a fallback is provided.
-    overheadCompensationFactor: 1.06,
-    //can be changed to compensatie for transport overhead. (see doc.md for some other values)
-    useMebibits: false,
-    //if set to true, speed will be reported in mebibits/s instead of megabits/s
-    telemetry_level: 0,
-    // 0=disabled, 1=basic (results only), 2=full (results and timing) 3=debug (results+log)
-    url_telemetry: "results/telemetry.php",
-    // path to the script that adds telemetry data to the database
-    telemetry_extra: "",
-    //extra data that can be passed to the telemetry through the settings
-    forceIE11Workaround: false //when set to true, it will foce the IE11 upload test on all browsers. Debug only
-  };
+class BaseSpeed {}
 
+class PingSpeed extends BaseSpeed {
+  manager;
+  inter = undefined;
+  startT = new Date().getTime(); //when the test was started
+  prevT = null; // last time a pong was received
+  ping = 0.0; // current ping value
+  jitter = 0.0; // current jitter value
+  i = 0; // counter of pongs received
+  prevInstspd = 0; // last ping time, used for jitter calculation
+  progress = 0;
+  status = undefined;
+  constructor(manager) {
+    super();
+    this.manager = manager;
+  }
+  processOne(url = "") {
+    if (this.progress < 1) {
+      setTimeout(() => {
+        this.progress = this.i / this.manager.settings.count_ping;
+        axios.get(url + "r=" + Math.random(), {
+          headers: {
+            // "Content-Encoding": "identity",
+            // "X-Requested-With": "XMLHttpRequest",
+            // "Cache-Control":
+            //   "no-cache,no-store,must-revalidate,max-age=-1,private",
+            // Expires: "-1",
+          }
+          // validateStatus: function () {
+          //   return true;
+          // },
+        }).then(() => {
+          if (this.i === 0) {
+            this.prevT = new Date().getTime();
+          } else {
+            let instspd = new Date().getTime() - this.prevT;
+            if (instspd < 1) instspd = this.prevInstspd;
+            if (instspd < 1) instspd = 1;
+            let instjitter = Math.abs(instspd - this.prevInstspd);
+            if (this.i === 1) this.ping = instspd;
+            /* first ping, can't tell jitter yet*/else {
+              if (instspd < this.ping) this.ping = instspd; // update ping, if the instant ping is lower
+              if (this.i === 2) this.jitter = instjitter;
+              //discard the first jitter measurement because it might be much higher than it should be
+              else this.jitter = instjitter > this.jitter ? this.jitter * 0.3 + instjitter * 0.7 : this.jitter * 0.8 + instjitter * 0.2; // update jitter, weighted average. spikes in ping values are given more weight.
+            }
+
+            this.prevInstspd = instspd;
+          }
+          let pingStatus = this.ping.toFixed(2);
+          let jitterStatus = this.jitter.toFixed(2);
+          this.i++;
+          if (this.i < this.manager.settings.count_ping) {
+            this.manager.AddInfo("ping", {
+              process: this.progress,
+              ping: pingStatus,
+              jitter: jitterStatus
+            });
+            this.processOne(url);
+          } else {
+            this.progress = 1;
+            this.manager.AddInfo("ping", {
+              process: this.progress,
+              ping: pingStatus,
+              jitter: jitterStatus
+            });
+          }
+        }).catch(_ => {
+          this.i++;
+          if (this.i < this.manager.settings.count_ping) {
+            this.processOne(url);
+            this.manager.AddInfo("ping", null);
+          }
+        });
+      }, 0);
+    }
+  }
+  start() {
+    this.progress = 0;
+    this.ping = 0;
+    this.jitter = 0;
+    this.status = "";
+    this.i = 0;
+    let url = this.manager.server.server + "/" + this.manager.server.pingURL + "?";
+    if (this.manager.settings.mpot) url += "cors=true&";
+    setTimeout(() => {
+      this.processOne(url);
+    }, 200);
+    setTimeout(() => {
+      this.prevT = new Date().getTime();
+    }, 200);
+  }
+  stop() {}
+}
+
+// import { DownloadSpeed } from "./download";
+// import { UploadSpeed } from "./upload";
+class ManagerSpeed {
+  //https://fra.speedtest.clouvider.net/backend/
   server = {
     name: "Amsterdam, Netherlands (Clouvider)",
-    server: "//ams.speedtest.clouvider.net/backend",
+    server: "//fra.speedtest.clouvider.net/backend",
     id: 51,
     dlURL: "garbage.php",
     ulURL: "empty.php",
@@ -18372,43 +18414,57 @@ class Worker {
     sponsorName: "Clouvider",
     sponsorURL: "https://www.clouvider.co.uk/"
   };
-  ipInfo = {};
-  async start() {
-    this.ipInfo = await this.getIp();
-    console.log(this.ipInfo);
-    console.log(this.fakeDataUpload().size);
+  settings = {
+    mpot: false,
+    test_order: "IP_D_U",
+    time_ul_max: 15,
+    time_dl_max: 15,
+    time_auto: true,
+    time_ulGraceTime: 1.5,
+    time_dlGraceTime: 1.5,
+    count_ping: 20,
+    url_dl: "garbage.php",
+    url_ul: "empty.php",
+    url_ping: "empty.php",
+    url_getIp: "getIP.php",
+    getIp_ispInfo: true,
+    getIp_ispInfo_distance: "km",
+    xhr_dlMultistream: 6,
+    xhr_ulMultistream: 3,
+    xhr_multistreamDelay: 300,
+    xhr_ignoreErrors: 1,
+    xhr_dlUseBlob: false,
+    xhr_ul_blob_megabytes: 20,
+    garbagePhp_chunkSize: 100,
+    enable_quirks: true,
+    ping_allowPerformanceApi: true,
+    overheadCompensationFactor: 1.06,
+    useMebibits: false,
+    telemetry_level: 0,
+    url_telemetry: "results/telemetry.php",
+    telemetry_extra: "",
+    forceIE11Workaround: false //when set to true, it will foce the IE11 upload test on all browsers. Debug only
+  };
+
+  async Start() {
+    await Promise.all([
+    // new DownloadSpeed(this).start(),
+    // new UploadSpeed(this).start(),
+    new PingSpeed(this).start()]);
   }
-  stop() {}
-  async getIp() {
-    let url = this.server.server + "/" + this.server.getIpURL + "?";
-    if (this.settings.mpot) url += "cors=true&";
-    if (this.settings.getIp_ispInfo) url += "isp=true&";
-    if (this.settings.getIp_ispInfo_distance) url += "distance=" + this.settings.getIp_ispInfo_distance + "&";
-    url += "r=" + Math.random();
-    return await axios(url).then(response => {
-      return response.data;
-    });
-  }
-  fakeDataUpload(sizeMb = 20) {
-    var byteNumbers = new Array(sizeMb * 1024 * 1024);
-    for (var i = 0; i < byteNumbers.length; i++) {
-      byteNumbers[i] = Math.floor(Math.random() * 256);
-    }
-    var byteArray = new Uint8Array(byteNumbers);
-    return new node_buffer.Blob([byteArray], {
-      type: "application/octet-stream"
-    });
+  AddInfo(type, data) {
+    console.log(type, data);
   }
 }
 
 class SpeedTest {
-  inst = new Worker();
+  inst = new ManagerSpeed();
   servers = [];
   async loadServer() {
     this.servers = await axios("https://speedtest.hau.xyz/servers.json");
   }
-  async start() {
-    await this.inst.start();
+  start() {
+    this.inst.Start();
   }
 }
 
