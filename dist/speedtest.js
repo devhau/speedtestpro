@@ -14,6 +14,7 @@ var require$$1$2 = require('tty');
 var require$$0$2 = require('os');
 var zlib = require('zlib');
 var EventEmitter = require('events');
+var node_buffer = require('node:buffer');
 
 function _interopDefaultLegacy (e) { return e && typeof e === 'object' && 'default' in e ? e : { 'default': e }; }
 
@@ -18305,6 +18306,125 @@ axios.default = axios;
 
 class BaseSpeed {}
 
+class DownloadSpeed extends BaseSpeed {
+  manager;
+  controller = new AbortController();
+  inter = undefined;
+  totLoaded = 0.0; // total number of transmitted bytes
+  startT = new Date().getTime(); // timestamp when test was started
+  bonusT = 0; //how many milliseconds the test has been shortened by (higher on faster connections)
+  graceTimeDone = false; //set to true after the grace time is past
+  failed = false; // set to true if a stream fails
+  progress = 0;
+  status = undefined;
+  constructor(manager) {
+    super();
+    this.manager = manager;
+  }
+  clear() {
+    if (this.inter) {
+      clearInterval(this.inter);
+      setTimeout(() => this.inter = undefined, 1000);
+      this.controller.abort();
+      console.log("DownloadSpeed");
+    }
+  }
+  processOne(url = "", data = undefined) {
+    if (this.progress < 1) {
+      setTimeout(() => {
+        var prevLoaded = 0;
+        axios.get(url + "r=" + Math.random(), {
+          headers: {
+            responseType: this.manager.settings.xhr_dlUseBlob ? "blob" : "arraybuffer",
+            "Content-Encoding": "identity",
+            "X-Requested-With": "XMLHttpRequest",
+            "Cache-Control": "no-cache,no-store,must-revalidate,max-age=-1,private",
+            Expires: "-1"
+          },
+          signal: this.controller.signal,
+          onDownloadProgress: event => {
+            let loadDiff = event.loaded <= 0 ? 0 : event.loaded - prevLoaded;
+            if (isNaN(loadDiff) || !isFinite(loadDiff) || loadDiff < 0) return; // just in case
+            this.totLoaded += loadDiff;
+            prevLoaded = event.loaded;
+          },
+          validateStatus: function () {
+            return true;
+          }
+        }).then(() => {
+          this.processOne(url, data);
+        }).catch(_ => {});
+      }, 0);
+    }
+  }
+  updateStatusProccess() {
+    this.inter = setInterval(() => {
+      let t = new Date().getTime() - this.startT;
+      if (this.graceTimeDone) {
+        this.progress = (t + this.bonusT) / (this.manager.settings.time_ul_max * 1000);
+      }
+      if (t < 200) return;
+      if (!this.graceTimeDone) {
+        if (t > 1000 * this.manager.settings.time_ulGraceTime) {
+          if (this.totLoaded > 0) {
+            // if the connection is so slow that we didn't get a single chunk yet, do not reset
+            this.startT = new Date().getTime();
+            this.bonusT = 0;
+            this.totLoaded = 0.0;
+          }
+          this.graceTimeDone = true;
+        }
+        var speed = this.totLoaded / (t / 1000.0);
+        this.manager.AddInfo("download", {
+          progress: this.progress,
+          status: this.status,
+          speed: speed
+        });
+      } else {
+        var speed = this.totLoaded / (t / 1000.0);
+        if (this.manager.settings.time_auto) {
+          //decide how much to shorten the test. Every 200ms, the test is shortened by the bonusT calculated here
+          var bonus = 5.0 * speed / 100000;
+          this.bonusT += bonus > 400 ? 400 : bonus;
+        }
+        //update status
+        this.status = (speed * 8 * this.manager.settings.overheadCompensationFactor / (this.manager.settings.useMebibits ? 1048576 : 1000000)).toFixed(2); // speed is multiplied by 8 to go from bytes to bits, overhead compensation is applied, then everything is divided by 1048576 or 1000000 to go to megabits/mebibits
+        if ((t + this.bonusT) / 1000.0 > this.manager.settings.time_ul_max || this.failed) {
+          // test is over, stop streams and timer
+          if (this.failed || isNaN(this.status)) this.status = "Fail";
+          this.clear();
+          this.progress = 1;
+        }
+        this.manager.AddInfo("download", {
+          progress: this.progress,
+          status: this.status,
+          speed: speed
+        });
+      }
+    }, 200);
+  }
+  start() {
+    this.progress = 0;
+    this.status = "";
+    this.failed = false;
+    this.updateStatusProccess();
+    let url = this.manager.server.server + "/" + this.manager.server.dlURL + "?";
+    if (this.manager.settings.mpot) url += "cors=true&";
+    if (this.manager.settings.garbagePhp_chunkSize) {
+      url += "ckSize=" + this.manager.settings.garbagePhp_chunkSize + "&";
+    }
+    setTimeout(() => {
+      for (let i = 0; i < this.manager.settings.xhr_dlMultistream; i++) {
+        this.processOne(url);
+      }
+    }, 200);
+    setTimeout(() => {
+      this.startT = new Date().getTime();
+    }, 200);
+  }
+  stop() {}
+}
+
 class PingSpeed extends BaseSpeed {
   manager;
   inter = undefined;
@@ -18399,20 +18519,144 @@ class PingSpeed extends BaseSpeed {
   stop() {}
 }
 
-// import { DownloadSpeed } from "./download";
-// import { UploadSpeed } from "./upload";
+class UploadSpeed extends BaseSpeed {
+  manager;
+  controller = new AbortController();
+  inter = undefined;
+  totLoaded = 0.0; // total number of transmitted bytes
+  startT = new Date().getTime(); // timestamp when test was started
+  bonusT = 0; //how many milliseconds the test has been shortened by (higher on faster connections)
+  graceTimeDone = false; //set to true after the grace time is past
+  failed = false; // set to true if a stream fails
+  progress = 0;
+  status = undefined;
+  constructor(manager) {
+    super();
+    this.manager = manager;
+  }
+  fakeData(sizeMb = 100) {
+    var byteNumbers = new Array(sizeMb * 1024 * 1024);
+    for (var i = 0; i < byteNumbers.length; i++) {
+      byteNumbers[i] = Math.floor(Math.random() * 256);
+    }
+    var byteArray = new Uint8Array(byteNumbers);
+    return new node_buffer.Blob([byteArray], {
+      type: "application/octet-stream"
+    });
+  }
+  clear() {
+    if (this.inter) {
+      clearInterval(this.inter);
+      setTimeout(() => this.inter = undefined, 1000);
+      this.controller.abort();
+      console.log("UploadSpeed");
+    }
+  }
+  processOne(url = "", data = undefined) {
+    if (data && this.progress < 1) {
+      setTimeout(() => {
+        var prevLoaded = 0;
+        axios.put(url + "r=" + Math.random(), data, {
+          headers: {
+            "Content-Encoding": "identity",
+            "X-Requested-With": "XMLHttpRequest",
+            "Cache-Control": "no-cache,no-store,must-revalidate,max-age=-1,private",
+            Expires: "-1",
+            "Content-Type": "application/octet-stream"
+          },
+          signal: this.controller.signal,
+          onUploadProgress: event => {
+            let loadDiff = event.loaded <= 0 ? 0 : event.loaded - prevLoaded;
+            if (isNaN(loadDiff) || !isFinite(loadDiff) || loadDiff < 0) return; // just in case
+            this.totLoaded += loadDiff;
+            prevLoaded = event.loaded;
+          },
+          validateStatus: function () {
+            return true;
+          }
+        }).then(() => {
+          this.processOne(url, data);
+        }).catch(_ => {});
+      }, 0);
+    }
+  }
+  updateStatusProccess() {
+    this.inter = setInterval(() => {
+      let t = new Date().getTime() - this.startT;
+      if (this.graceTimeDone) {
+        this.progress = (t + this.bonusT) / (this.manager.settings.time_ul_max * 1000);
+      }
+      if (t < 200) return;
+      if (!this.graceTimeDone) {
+        if (t > 1000 * this.manager.settings.time_ulGraceTime) {
+          if (this.totLoaded > 0) {
+            // if the connection is so slow that we didn't get a single chunk yet, do not reset
+            this.startT = new Date().getTime();
+            this.bonusT = 0;
+            this.totLoaded = 0.0;
+          }
+          this.graceTimeDone = true;
+        }
+        var speed = this.totLoaded / (t / 1000.0);
+        this.manager.AddInfo("upload", {
+          progress: this.progress,
+          status: this.status,
+          speed: speed
+        });
+      } else {
+        var speed = this.totLoaded / (t / 1000.0);
+        if (this.manager.settings.time_auto) {
+          //decide how much to shorten the test. Every 200ms, the test is shortened by the bonusT calculated here
+          var bonus = 5.0 * speed / 100000;
+          this.bonusT += bonus > 400 ? 400 : bonus;
+        }
+        //update status
+        this.status = (speed * 8 * this.manager.settings.overheadCompensationFactor / (this.manager.settings.useMebibits ? 1048576 : 1000000)).toFixed(2); // speed is multiplied by 8 to go from bytes to bits, overhead compensation is applied, then everything is divided by 1048576 or 1000000 to go to megabits/mebibits
+        if ((t + this.bonusT) / 1000.0 > this.manager.settings.time_ul_max || this.failed) {
+          // test is over, stop streams and timer
+          if (this.failed || isNaN(this.status)) this.status = "Fail";
+          this.clear();
+          this.progress = 1;
+        }
+        this.manager.AddInfo("upload", {
+          progress: this.progress,
+          status: this.status,
+          speed: speed
+        });
+      }
+    }, 200);
+  }
+  start() {
+    this.progress = 0;
+    this.status = "";
+    this.failed = false;
+    this.updateStatusProccess();
+    let url = this.manager.server.server + "/" + this.manager.server.ulURL + "?";
+    if (this.manager.settings.mpot) url += "cors=true&";
+    const data = this.fakeData();
+    setTimeout(() => {
+      for (let i = 0; i < this.manager.settings.xhr_ulMultistream; i++) {
+        this.processOne(url, data);
+      }
+    }, 200);
+    setTimeout(() => {
+      this.startT = new Date().getTime();
+    }, 200);
+  }
+  stop() {}
+}
+
 class ManagerSpeed {
-  //https://fra.speedtest.clouvider.net/backend/
   server = {
-    name: "Amsterdam, Netherlands (Clouvider)",
-    server: "//fra.speedtest.clouvider.net/backend",
-    id: 51,
-    dlURL: "garbage.php",
-    ulURL: "empty.php",
-    pingURL: "empty.php",
-    getIpURL: "getIP.php",
-    sponsorName: "Clouvider",
-    sponsorURL: "https://www.clouvider.co.uk/"
+    name: "Tokyo, Japan (A573)",
+    server: "https://librespeed.a573.net/",
+    id: 82,
+    dlURL: "backend/garbage.php",
+    ulURL: "backend/empty.php",
+    pingURL: "backend/empty.php",
+    getIpURL: "backend/getIP.php",
+    sponsorName: "A573",
+    sponsorURL: "https://mirror.a573.net/"
   };
   settings = {
     mpot: false,
@@ -18447,10 +18691,7 @@ class ManagerSpeed {
   };
 
   async Start() {
-    await Promise.all([
-    // new DownloadSpeed(this).start(),
-    // new UploadSpeed(this).start(),
-    new PingSpeed(this).start()]);
+    await Promise.all([new DownloadSpeed(this).start(), new UploadSpeed(this).start(), new PingSpeed(this).start()]);
   }
   AddInfo(type, data) {
     console.log(type, data);
@@ -18463,8 +18704,8 @@ class SpeedTest {
   async loadServer() {
     this.servers = await axios("https://speedtest.hau.xyz/servers.json");
   }
-  start() {
-    this.inst.Start();
+  async start() {
+    await this.inst.Start();
   }
 }
 

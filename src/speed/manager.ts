@@ -1,19 +1,18 @@
-// import { DownloadSpeed } from "./download";
+import { DownloadSpeed } from "./download";
 import { PingSpeed } from "./ping";
-// import { UploadSpeed } from "./upload";
+import { UploadSpeed } from "./upload";
 
 export class ManagerSpeed {
-  //https://fra.speedtest.clouvider.net/backend/
   server = {
-    name: 'Tokyo, Japan (A573)',
-    server: 'https://librespeed.a573.net/',
+    name: "Tokyo, Japan (A573)",
+    server: "https://librespeed.a573.net/",
     id: 82,
-    dlURL: 'backend/garbage.php',
-    ulURL: 'backend/empty.php',
-    pingURL: 'backend/empty.php',
-    getIpURL: 'backend/getIP.php',
-    sponsorName: 'A573',
-    sponsorURL: 'https://mirror.a573.net/'
+    dlURL: "backend/garbage.php",
+    ulURL: "backend/empty.php",
+    pingURL: "backend/empty.php",
+    getIpURL: "backend/getIP.php",
+    sponsorName: "A573",
+    sponsorURL: "https://mirror.a573.net/",
   };
   settings = {
     mpot: false, //set to true when in MPOT mode
@@ -49,8 +48,8 @@ export class ManagerSpeed {
 
   async Start() {
     await Promise.all([
-      // new DownloadSpeed(this).start(),
-      // new UploadSpeed(this).start(),
+      new DownloadSpeed(this).start(),
+      new UploadSpeed(this).start(),
       new PingSpeed(this).start(),
     ]);
   }

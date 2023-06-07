@@ -4,5 +4,5 @@ export declare class SpeedTest {
     inst: ManagerSpeed;
     servers: never[];
     loadServer(): Promise<void>;
-    start(): void;
+    start(): Promise<void>;
 }

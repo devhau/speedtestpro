@@ -8,7 +8,7 @@ export class SpeedTest {
   async loadServer() {
     this.servers = await axios("https://speedtest.hau.xyz/servers.json");
   }
-  start() {
-    this.inst.Start();
+  async start() {
+    await this.inst.Start();
   }
 }

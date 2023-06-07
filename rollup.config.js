@@ -8,56 +8,86 @@ import json from "@rollup/plugin-json";
 const extensions = [".js", ".jsx", ".ts", ".tsx"];
 const name = "speedtest";
 
-export default {
-  input: "./src/speedtest.ts",
+export default [
+  {
+    input: "./src/speedtest.ts",
+    // Specify here external modules which you don't want to include in your bundle (for instance: 'lodash', 'moment' etc.)
+    // https://rollupjs.org/guide/en/#external
+    external: [],
+    plugins: [
+      typescript(),
+      // Allows node_modules resolution
+      resolve({
+        extensions,
+        jsnext: true,
+        browser: false,
+      }),
 
-  // Specify here external modules which you don't want to include in your bundle (for instance: 'lodash', 'moment' etc.)
-  // https://rollupjs.org/guide/en/#external
-  external: [],
+      // Allow bundling cjs modules. Rollup doesn't understand cjs
+      commonjs(),
+      // Compile TypeScript/JavaScript files
+      babel({
+        extensions,
+        babelHelpers: "bundled",
+        // presets: [["solid", { generate: "ssr", hydratable: true }]],
+        include: ["src/**/*"],
+      }),
+      scss(),
+      json(),
+    ],
 
-  plugins: [
-    typescript(),
-    // Allows node_modules resolution
-    resolve({
-      extensions,
-      jsnext: true,
-      browser: false,
-    }),
-
-    // Allow bundling cjs modules. Rollup doesn't understand cjs
-    commonjs(),
-    // Compile TypeScript/JavaScript files
-    babel({
-      extensions,
-      babelHelpers: "bundled",
-      // presets: [["solid", { generate: "ssr", hydratable: true }]],
-      include: ["src/**/*"],
-    }),
-    scss(),
-    json(),
-  ],
-
-  output: [
-    {
-      file: pkg.main,
-      format: "cjs",
-    },
-    {
-      file: pkg.module,
-      format: "esm",
-      // Removes the hash from the asset filename
-      assetFileNames: "[name][extname]",
-    },
-    {
-      file: pkg.browser,
-      format: "iife",
-      sourcemap: "inline",
-      name,
-      // https://rollupjs.org/guide/en/#outputglobals
-      globals: {
-        "node:buffer": "window",
-        axios: "node_modules/axios/dist/browser/axios.cjs.js",
+    output: [
+      {
+        file: pkg.main,
+        format: "cjs",
       },
-    },
-  ],
-};
+      {
+        file: pkg.module,
+        format: "esm",
+        // Removes the hash from the asset filename
+        assetFileNames: "[name][extname]",
+      },
+    ],
+  },
+  {
+    input: "./src/speedtest.ts",
+
+    // Specify here external modules which you don't want to include in your bundle (for instance: 'lodash', 'moment' etc.)
+    // https://rollupjs.org/guide/en/#external
+    external: [],
+    plugins: [
+      typescript(),
+      // Allows node_modules resolution
+      resolve({
+        extensions,
+        jsnext: true,
+        browser: true,
+      }),
+
+      // Allow bundling cjs modules. Rollup doesn't understand cjs
+      commonjs(),
+      // Compile TypeScript/JavaScript files
+      babel({
+        extensions,
+        babelHelpers: "bundled",
+        // presets: [["solid", { generate: "ssr", hydratable: true }]],
+        include: ["src/**/*"],
+      }),
+      scss(),
+      json(),
+    ],
+    output: [
+      {
+        file: pkg.browser,
+        format: "iife",
+        sourcemap: "inline",
+        name,
+        // https://rollupjs.org/guide/en/#outputglobals
+        globals: {
+          "node:buffer": "window",
+          axios: "node_modules/axios/dist/browser/axios.cjs.js",
+        },
+      },
+    ],
+  },
+];
