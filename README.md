@@ -20,7 +20,7 @@ yarn add speedtestpro
 
 
 ## Wiki and Change Log
-[Wiki including Change Log](https://github.com/devhau/speedtest/wiki)
+[Wiki including Change Log](https://github.com/devhau/speedtestpro/wiki)
 
 ## Breaking Changes
 
@@ -33,15 +33,6 @@ The following animations options have been deprecated and should be replaced:
 ### 3 Easy Steps
 For other API calls, see the [demo](https://speedtest.hau.xyz).
 
-1. Link to speedtest.css `<link href="speedtest.css" rel="stylesheet"/>`
-
-2. Link to speedtest.js `<script src="speedtest.js"></script>`
-
-3. use speedtest to display a toast for info, success, warning or error
-	```js
-	// Display an info toast with no title
-	speedtest.info('Are you the 6 fingered man?')
-	```
 
 ### Other Options
 

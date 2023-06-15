@@ -1,4 +1,4 @@
-import "./speedtest.scss";
+import "./speedtestpro.scss";
 import { ManagerSpeed } from "./speed/manager";
 export declare class SpeedTest {
     inst: ManagerSpeed;

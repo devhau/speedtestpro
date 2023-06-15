@@ -1,5 +1,5 @@
 import axios from "axios";
-import "./speedtest.scss";
+import "./speedtestpro.scss";
 import { ManagerSpeed } from "./speed/manager";
 
 export class SpeedTest {

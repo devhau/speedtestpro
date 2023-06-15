@@ -34,7 +34,7 @@ export class Worker {
   };
   server = {
     name: "Amsterdam, Netherlands (Clouvider)",
-    server: "//ams.speedtest.clouvider.net/backend",
+    server: "//ams.speedtestpro.clouvider.net/backend",
     id: 51,
     dlURL: "garbage.php",
     ulURL: "empty.php",

@@ -1,11 +1,11 @@
 {
   "name": "speedtestpro",
-  "version": "1.0.0-beta",
-  "description": "**speedtest** is a Javascript library for non-blocking notifications and without jQuery. The goal is to create a simple core library that can be customized and extended.",
-  "main": "dist/speedtest.js",
-  "module": "dist/speedtest.esm.js",
-  "browser": "dist/speedtest.iife.js",
-  "types": "dist/types/speedtest.d.ts",
+  "version": "1.0.1",
+  "description": "**speedtestpro** is a Javascript library for non-blocking notifications and without jQuery. The goal is to create a simple core library that can be customized and extended.",
+  "main": "dist/speedtestpro.js",
+  "module": "dist/speedtestpro.esm.js",
+  "browser": "dist/speedtestpro.iife.js",
+  "types": "dist/types/speedtestpro.d.ts",
   "files": [
     "dist/*"
   ],
@@ -21,7 +21,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/devhau/speedtest.git"
+    "url": "git+https://github.com/devhau/speedtestpro.git"
   },
   "keywords": [],
   "author": "",

@@ -6,11 +6,11 @@ import scss from "rollup-plugin-scss";
 import pkg from "./package.json";
 import json from "@rollup/plugin-json";
 const extensions = [".js", ".jsx", ".ts", ".tsx"];
-const name = "speedtest";
+const name = "speedtestpro";
 
 export default [
   {
-    input: "./src/speedtest.ts",
+    input: "./src/speedtestpro.ts",
     // Specify here external modules which you don't want to include in your bundle (for instance: 'lodash', 'moment' etc.)
     // https://rollupjs.org/guide/en/#external
     external: [],
@@ -50,7 +50,7 @@ export default [
     ],
   },
   {
-    input: "./src/speedtest.ts",
+    input: "./src/speedtestpro.ts",
 
     // Specify here external modules which you don't want to include in your bundle (for instance: 'lodash', 'moment' etc.)
     // https://rollupjs.org/guide/en/#external
